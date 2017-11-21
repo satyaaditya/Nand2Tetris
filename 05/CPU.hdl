@@ -40,4 +40,38 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+	//----------------------decide whether input is instruction or alu output -----------------------------------------
+	Mux16(a[15] = false,a[0..14] = instruction[0..14],b = aluout, sel = instruction[15], out = mux1out);
+	Not(in = instruction[15],out = inst);
+	Or(a = inst,b = instruction[5], out = loada);
+	ARegister(in = mux1out,load = loada,out = mux2in,out[0..14] = addressM);
+	
+	// ---------------------decide output to alu is A or M ------------------------------------------------------------
+	Mux16(a = mux2in,b = inM,sel = instruction[12],out = mux2out);
+	
+	//-----------Dregister---------------------------------------------------------------------------------------------
+	And(a = instruction[4],b = instruction[15],out = loadd);
+	DRegister(in = aluout,load = loadd,out = din);
+	
+	//-----------ALU---------------------------------------------------------------------------------------------------
+	ALU(x = din,y = mux2out, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6],
+        out=aluout, out=outM, zr=zr, ng=lt);
+	
+	//---------------------writeM--------------------------------------------------------------------------------------
+	And(a = instruction[3],b = instruction[15],out = writeM);
+	
+	//----------------------determine jump conditions for pc ::: lt := out < 0, zr := out == 0 ----------------------------------------------------------
+	Or(a = lt,b =zr,out = lte);
+	Not(in = lte,out = gt);
+	
+	And(a = instruction[0],b = gt,out = jgt);
+	And(a = instruction[1],b = zr,out = jeq);
+	And(a = instruction[2],b = lt,out = jlt);
+	Or(a = jlt,b = jeq, out = jle);
+	Or(a = jle,b = jgt,out = jmp);
+	
+	And(a = instruction[15],b = jmp,out = loadpc); // load pc when c inst and other conditions are met
+	Not(in = loadpc,out = incpc);
+	PC(in = mux2in,load = loadpc,inc = incpc,reset = reset,out[0..14] = pc);
+
 }
